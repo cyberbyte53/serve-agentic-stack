@@ -1,4 +1,4 @@
-"""Transport contract tests for the nudge MCP tools (issue #25, Bug 4).
+"""Transport contract tests for the nudge MCP tools (issue #25).
 
 Every MCP client in this repo (domain_client, the nudge scheduler)
 calls tools with arguments wrapped as {"params": {...}}, matching the

@@ -1,4 +1,4 @@
-"""Unit tests for SessionService row serialisation (issue #25, Bug 1a).
+"""Unit tests for SessionService row serialisation (issue #25 opt-out).
 
 _row_to_dict is the single place session rows become dicts for MCP
 tool callers (list_sessions, get_session, ...). Anything it omits is
@@ -29,7 +29,7 @@ def _row(**overrides):
 
 
 def test_row_to_dict_exposes_do_not_disturb():
-    """Bug 1a proof: the scheduler reads session["do_not_disturb"] to skip
+    """Opt-out read side: the scheduler reads session["do_not_disturb"] to skip
     opted-out volunteers. Before the fix _row_to_dict omitted the field,
     so the check always saw None and 'stop' replies were re-nudged."""
     result = SessionService.__new__(SessionService)._row_to_dict(

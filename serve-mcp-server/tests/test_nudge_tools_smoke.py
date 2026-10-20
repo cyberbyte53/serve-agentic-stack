@@ -1,4 +1,4 @@
-"""Execution smoke tests for the nudge MCP tools (issue #25, Bug 4b).
+"""Execution smoke tests for the nudge MCP tools (issue #25).
 
 The transport contract tests pin the argument shape; these pin that
 the tools actually execute. nudge_schedule and nudge_mark_sent

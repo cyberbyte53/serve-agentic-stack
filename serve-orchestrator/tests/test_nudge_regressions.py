@@ -1,9 +1,9 @@
-"""Bug proofs for issue #25 (Smart Nudges) — written BEFORE any fix.
+"""Regression tests for issue #25 (Smart Nudges) — written BEFORE any fix.
 
 Each test asserts the CORRECT behaviour. At commit 452eb1b they failed
 against the unmodified code for the reasons in each docstring; they now
-serve as the regression suite. (The _row_to_dict proof lives with the
-MCP server's own tests: serve-mcp-server/tests/test_session_service.py.)
+serve as the regression suite. (The _row_to_dict test lives with the MCP
+server's own tests: serve-mcp-server/tests/test_session_service.py.)
 """
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
@@ -24,9 +24,9 @@ def client():
     return TestClient(main.app)
 
 
-# ─── Bug 1: `stop` opt-out is broken end to end ─────────────────────────────
+# ─── `stop` opt-out: the flag must persist and reach the scheduler ──────────
 
-async def test_bug1b_mark_do_not_disturb_persists_the_flag(monkeypatch):
+async def test_mark_do_not_disturb_persists_the_flag(monkeypatch):
     """mark_do_not_disturb must write the flag via an MCP tool.
 
     Before the fix it only cancelled pending nudges; no MCP tool wrote
@@ -45,9 +45,9 @@ async def test_bug1b_mark_do_not_disturb_persists_the_flag(monkeypatch):
     assert fake.sessions[SESSION_ID]["do_not_disturb"] is True
 
 
-# ─── Bug 2: reply cancellation in the webhook is never awaited ──────────────
+# ─── Reply cancellation: the webhook must actually run the cancel ───────────
 
-def test_bug2_webhook_reply_cancels_pending_nudges(client, monkeypatch):
+def test_webhook_reply_cancels_pending_nudges(client, monkeypatch):
     """A WhatsApp reply must cancel the volunteer's pending nudges.
 
     Before the fix, wa_receive called cancel_nudges_for_session without
@@ -72,10 +72,10 @@ def test_bug2_webhook_reply_cancels_pending_nudges(client, monkeypatch):
     assert "nudge_set_do_not_disturb" in fake.tools_called()
 
 
-async def test_bug2_control_awaited_cancel_actually_cancels(monkeypatch):
+async def test_awaited_cancel_actually_cancels(monkeypatch):
     """Control: the cancel function itself works when awaited.
 
-    This passed even before the fix, isolating Bug 2 to the call site
+    This passed even before the fix, isolating the defect to the call site
     in main.py rather than the cancellation logic.
     """
     fake = FakeMCP([make_silent_session()])
@@ -93,9 +93,9 @@ async def test_bug2_control_awaited_cancel_actually_cancels(monkeypatch):
     assert fake.nudges[0]["cancelled"] is True
 
 
-# ─── Bug 3: frequency cap leaks and nothing auto-pauses ─────────────────────
+# ─── Frequency cap: no restart after the final nudge, no duplicates ────────
 
-async def test_bug3a_no_new_cycle_after_third_nudge(monkeypatch):
+async def test_no_new_cycle_after_third_nudge(monkeypatch):
     """After nudges #1-#3 have all been sent, a still-silent session must
     not be scheduled a fresh nudge #1.
 
@@ -103,7 +103,7 @@ async def test_bug3a_no_new_cycle_after_third_nudge(monkeypatch):
     any active silent session; the real nudge_schedule tool only dedups
     UNSENT rows, so the 1h/8h/24h cycle restarted forever. The
     docstring's promise — "After 3 nudges with no reply, session is
-    auto-paused" — is what stops this (see Bug 3b).
+    auto-paused" — is what stops this (see the auto-pause test below).
     """
     fake = FakeMCP([make_silent_session()])
     wire_scheduler(monkeypatch, fake)
@@ -127,7 +127,7 @@ async def test_bug3a_no_new_cycle_after_third_nudge(monkeypatch):
     )
 
 
-async def test_bug3c_no_duplicate_first_nudge_between_cycles(monkeypatch):
+async def test_no_duplicate_first_nudge_between_cycles(monkeypatch):
     """Repeated scheduler scans during one silence episode must not
     re-queue nudge #1 once it has been sent.
 
@@ -152,12 +152,12 @@ async def test_bug3c_no_duplicate_first_nudge_between_cycles(monkeypatch):
     assert unsent_first == [], f"duplicate nudge #1 queued: {unsent_first}"
 
 
-async def test_bug3b_session_paused_after_third_nudge(monkeypatch):
+async def test_session_paused_after_third_nudge(monkeypatch):
     """Sending nudge #3 must pause the session (scheduler docstring:
     "After 3 nudges with no reply, session is auto-paused").
 
     Before the fix, process_due_nudges only marked the nudge sent; the
-    session stayed active, which also enabled the Bug 3a re-scheduling.
+    session stayed active, which also enabled the cycle-restart covered above.
     """
     fake = FakeMCP([make_silent_session()])
     wire_scheduler(monkeypatch, fake)
