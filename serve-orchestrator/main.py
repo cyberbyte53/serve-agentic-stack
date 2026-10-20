@@ -318,7 +318,7 @@ async def wa_receive(request: Request):
                 )
                 # Cancel any pending nudges since volunteer has responded
                 if session_id:
-                    cancel_nudges_for_session(str(session_id) if session_id else "")
+                    await cancel_nudges_for_session(str(session_id))
 
                 # Handle "stop" — opt out of nudges
                 if text.lower() in ("stop", "🚫 stop", "don't disturb", "no reminders"):
