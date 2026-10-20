@@ -147,3 +147,35 @@ async def test_scheduler_dry_run_logs_without_sending(monkeypatch):
     sent = await ns.process_due_nudges()
     assert sent == 1
     assert fake.nudges[0]["sent_at"] is not None
+
+
+# ── Exhaustive stage coverage ────────────────────────────────────────────────
+
+def _all_registry_stages():
+    for wf_id, wf in nm.WORKFLOW_REGISTRY.items():
+        for stage_id in wf.stages:
+            yield wf_id, stage_id
+
+
+@pytest.mark.parametrize("wf_id,stage_id", list(_all_registry_stages()))
+def test_every_registry_stage_produces_a_safe_message(wf_id, stage_id):
+    """Every stage a volunteer can sit in must compose a message without
+    crashing and without leaking the raw stage id (e.g. 'delivery_operations')
+    into volunteer-facing copy."""
+    ctx = {"workflow": wf_id, "stage": stage_id, "volunteer_name": "Asha Verma"}
+    for n in (1, 2, 3):
+        msg = nm.build_nudge_message(ctx, n)
+        assert msg
+        assert stage_id not in msg, f"raw stage leaked for {wf_id}/{stage_id}"
+        if nm.resolve_bucket(ctx) == nm.GENERIC:
+            # Non-volunteer journeys (e.g. need coordination) get the
+            # original generic copy verbatim — no name personalisation.
+            assert msg == nm.GENERIC_MESSAGES[n]
+        else:
+            assert msg.startswith("Hi Asha!")
+
+
+def test_registry_stage_count_is_pinned():
+    # Guards the parametrize above against silently going empty/partial
+    # if the registry import shape changes.
+    assert len(list(_all_registry_stages())) >= 40

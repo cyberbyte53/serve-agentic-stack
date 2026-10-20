@@ -175,3 +175,12 @@ async def test_session_paused_after_third_nudge(monkeypatch):
         "session still active after final nudge; "
         f"tools called: {fake.tools_called()}"
     )
+
+
+def test_third_nudge_fires_inside_whatsapp_24h_window():
+    """WhatsApp only allows free-form messages within 24h of the user's
+    last message. Delays are absolute from last_message_at, so the final
+    nudge default must be < 1440 minutes (23h45m = 1425) or Meta can
+    reject it at exactly the 24h boundary."""
+    assert ns.NUDGE_DELAYS[3] < 24 * 60
+    assert ns.NUDGE_DELAYS[1] < ns.NUDGE_DELAYS[2] < ns.NUDGE_DELAYS[3]

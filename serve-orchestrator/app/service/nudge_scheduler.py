@@ -35,7 +35,10 @@ logger = logging.getLogger(__name__)
 NUDGE_ENABLED = os.environ.get("NUDGE_ENABLED", "true").lower() == "true"
 NUDGE_DELAY_1_MINUTES = int(os.environ.get("NUDGE_DELAY_1_MINUTES", "60"))
 NUDGE_DELAY_2_MINUTES = int(os.environ.get("NUDGE_DELAY_2_MINUTES", "480"))
-NUDGE_DELAY_3_MINUTES = int(os.environ.get("NUDGE_DELAY_3_MINUTES", "1440"))
+# 23h45m, not 24h: WhatsApp only allows free-form messages within 24h of
+# the volunteer's last message, so the final nudge must land inside that
+# window (with margin for the check interval) or Meta rejects it.
+NUDGE_DELAY_3_MINUTES = int(os.environ.get("NUDGE_DELAY_3_MINUTES", "1425"))
 NUDGE_QUIET_HOURS_START = int(os.environ.get("NUDGE_QUIET_HOURS_START", "21"))
 NUDGE_QUIET_HOURS_END = int(os.environ.get("NUDGE_QUIET_HOURS_END", "8"))
 NUDGE_CHECK_INTERVAL_MINUTES = int(os.environ.get("NUDGE_CHECK_INTERVAL_MINUTES", "5"))
