@@ -46,6 +46,8 @@ from schemas import (
     StartSessionInput, GetSessionInput, ResumeSessionInput, FindSessionByActorInput,
     UpdateSessionActorInput,
     AdvanceSessionStateInput, ListSessionsInput,
+    NudgeScheduleInput, NudgeGetDueInput, NudgeMarkSentInput,
+    NudgeCancelForSessionInput, NudgeSetDoNotDisturbInput,
     GetMissingFieldsInput, SaveVolunteerFieldsInput, EvaluateReadinessInput,
     SaveMessageInput, GetConversationInput,
     SaveMemorySummaryInput, GetMemorySummaryInput,
@@ -2102,8 +2104,12 @@ async def update_volunteer_registry_status(params: UpdateVolunteerRegistryStatus
 # ─────────────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
-async def nudge_schedule(session_id: str, volunteer_phone: str, nudge_number: int, scheduled_at: str, volunteer_name: str = "") -> dict:
+async def nudge_schedule(params: NudgeScheduleInput) -> dict:
     """Schedule a nudge reminder for an inactive WhatsApp session."""
+    session_id, volunteer_phone = params.session_id, params.volunteer_phone
+    nudge_number, scheduled_at = params.nudge_number, params.scheduled_at
+    volunteer_name = params.volunteer_name
+    from datetime import datetime
     from services.database import get_db, NudgeQueue, is_db_healthy
     from uuid import UUID
     if not is_db_healthy():
@@ -2138,8 +2144,9 @@ async def nudge_schedule(session_id: str, volunteer_phone: str, nudge_number: in
 
 
 @mcp.tool()
-async def nudge_get_due(now: str = "") -> dict:
+async def nudge_get_due(params: NudgeGetDueInput) -> dict:
     """Get all nudges that are due to be sent (scheduled_at <= now, not sent, not cancelled)."""
+    now = params.now
     from datetime import datetime
     from services.database import get_db, NudgeQueue, is_db_healthy
     from sqlalchemy import select, and_
@@ -2173,8 +2180,10 @@ async def nudge_get_due(now: str = "") -> dict:
 
 
 @mcp.tool()
-async def nudge_mark_sent(nudge_id: str) -> dict:
+async def nudge_mark_sent(params: NudgeMarkSentInput) -> dict:
     """Mark a nudge as sent."""
+    nudge_id = params.nudge_id
+    from datetime import datetime
     from services.database import get_db, NudgeQueue, is_db_healthy
     from sqlalchemy import update as sa_update
     from uuid import UUID
@@ -2193,8 +2202,9 @@ async def nudge_mark_sent(nudge_id: str) -> dict:
 
 
 @mcp.tool()
-async def nudge_cancel_for_session(session_id: str) -> dict:
+async def nudge_cancel_for_session(params: NudgeCancelForSessionInput) -> dict:
     """Cancel all pending nudges for a session (volunteer replied)."""
+    session_id = params.session_id
     from services.database import get_db, NudgeQueue, is_db_healthy
     from sqlalchemy import update as sa_update, and_
     from uuid import UUID
@@ -2217,12 +2227,13 @@ async def nudge_cancel_for_session(session_id: str) -> dict:
 
 
 @mcp.tool()
-async def nudge_set_do_not_disturb(session_id: str) -> dict:
+async def nudge_set_do_not_disturb(params: NudgeSetDoNotDisturbInput) -> dict:
     """Persist a volunteer's nudge opt-out on their session.
 
     Sets sessions.do_not_disturb so the nudge scheduler skips this
     session in future cycles (the flag is returned by list_sessions).
     """
+    session_id = params.session_id
     from services.database import get_db, Session as DBSession, is_db_healthy
     from sqlalchemy import update as sa_update
     from uuid import UUID

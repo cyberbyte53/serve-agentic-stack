@@ -166,6 +166,32 @@ class ListSessionsInput(BaseModel):
     limit: int = Field(default=50, ge=1, le=500)
 
 
+# ─── Nudge queue ─────────────────────────────────────────────────────────────
+
+class NudgeScheduleInput(BaseModel):
+    session_id: str
+    volunteer_phone: str
+    nudge_number: int
+    scheduled_at: str
+    volunteer_name: str = ""
+
+
+class NudgeGetDueInput(BaseModel):
+    now: str = ""
+
+
+class NudgeMarkSentInput(BaseModel):
+    nudge_id: str
+
+
+class NudgeCancelForSessionInput(BaseModel):
+    session_id: str
+
+
+class NudgeSetDoNotDisturbInput(BaseModel):
+    session_id: str
+
+
 # ─── Profile ─────────────────────────────────────────────────────────────────
 
 class GetMissingFieldsInput(BaseModel):
