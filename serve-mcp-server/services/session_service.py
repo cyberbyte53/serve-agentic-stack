@@ -248,6 +248,9 @@ class SessionService:
         if new_state in _TERMINAL:
             new_status = "completed"
         elif new_state == "paused":
+            # Map stage -> status: scan queries (e.g. the nudge scheduler's
+            # active-session list) filter on status, so a session paused
+            # only in stage would keep surfacing as active forever.
             new_status = "paused"
         else:
             new_status = None

@@ -316,7 +316,9 @@ async def wa_receive(request: Request):
                 from app.service.nudge_scheduler import (
                     cancel_nudges_for_session, mark_do_not_disturb, is_do_not_disturb
                 )
-                # Cancel any pending nudges since volunteer has responded
+                # Cancel any pending nudges since volunteer has responded.
+                # The await is load-bearing: without it the coroutine is
+                # created and discarded unexecuted, and nothing is cancelled.
                 if session_id:
                     await cancel_nudges_for_session(str(session_id))
 
