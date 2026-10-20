@@ -47,28 +47,41 @@ GENERIC_MESSAGES = {
 # add volunteer-friendly phrasing on top — registry display names are
 # admin labels (e.g. "Legacy Teaching Profile") unfit for a message.
 
+from app.schemas import OnboardingState
 from app.service.workflow_validator import (
     NEW_VOLUNTEER_ONBOARDING_WORKFLOW,
     WORKFLOW_REGISTRY,
 )
 
+
+def _parse_onboarding_state(context: Dict) -> Optional[OnboardingState]:
+    """Session stage string -> OnboardingState, or None if not onboarding."""
+    try:
+        return OnboardingState(context.get("stage") or "")
+    except ValueError:
+        return None
+
+
 # Onboarding-owned stages of the new-volunteer workflow, derived from
 # the registry so this can never drift from the real workflow.
 _ONBOARDING_STAGES = {
-    stage_id
+    state
     for stage_id, stage in NEW_VOLUNTEER_ONBOARDING_WORKFLOW.stages.items()
     if stage.responsible_agent == "onboarding"
-} - {"paused", "human_review"}
+    for state in [_parse_onboarding_state({"stage": stage_id})]
+    if state is not None
+} - {OnboardingState.PAUSED, OnboardingState.HUMAN_REVIEW}
 
-# Volunteer-friendly phrase for each onboarding stage. Keys must cover
+# Volunteer-friendly phrase for each onboarding stage, keyed by the
+# OnboardingState enum (never raw stage strings). Keys must cover
 # _ONBOARDING_STAGES exactly — a test enforces this against the registry.
 _ONBOARDING_STEP_PHRASES = {
-    "welcome": "getting started",
-    "orientation_video": "watching the short orientation video",
-    "eligibility_screening": "a few quick details about your background",
-    "contact_capture": "sharing your contact details",
-    "teaching_profile": "telling us the subjects and classes you'd like to teach",
-    "registration_review": "reviewing your profile before registration",
+    OnboardingState.WELCOME: "getting started",
+    OnboardingState.ORIENTATION_VIDEO: "watching the short orientation video",
+    OnboardingState.ELIGIBILITY_SCREENING: "a few quick details about your background",
+    OnboardingState.CONTACT_CAPTURE: "sharing your contact details",
+    OnboardingState.TEACHING_PROFILE: "telling us the subjects and classes you'd like to teach",
+    OnboardingState.REGISTRATION_REVIEW: "reviewing your profile before registration",
 }
 
 
@@ -127,7 +140,7 @@ def resolve_bucket(context: Dict) -> str:
         return "matched"
     if agent in ("engagement", "selection"):
         return "post_selection"
-    if agent == "onboarding" or (context.get("stage") or "") in _ONBOARDING_STAGES:
+    if agent == "onboarding" or _parse_onboarding_state(context) in _ONBOARDING_STAGES:
         return "onboarding"
     return "generic"
 
@@ -135,7 +148,7 @@ def resolve_bucket(context: Dict) -> str:
 def _hook(bucket: str, context: Dict) -> str:
     """One sentence referencing where the volunteer left off."""
     if bucket == "onboarding":
-        step = _ONBOARDING_STEP_PHRASES.get(context.get("stage") or "", "getting started")
+        step = _ONBOARDING_STEP_PHRASES.get(_parse_onboarding_state(context), "getting started")
         return f"You had started your volunteer onboarding with SERVE and left it at {step}."
     if bucket == "post_selection":
         return "You had shown interest in teaching with SERVE and completed your initial steps."
