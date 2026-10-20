@@ -199,6 +199,7 @@ async def check_and_schedule_new_nudges() -> None:
                 "nudge_number": 1,
                 "scheduled_at": send_at.isoformat(),
                 "volunteer_name": ch_meta.get("volunteer_name", ""),
+                "episode_start": last_msg,
             })
 
 

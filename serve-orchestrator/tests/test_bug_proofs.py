@@ -127,6 +127,31 @@ async def test_bug3a_no_new_cycle_after_third_nudge(monkeypatch):
     )
 
 
+async def test_bug3c_no_duplicate_first_nudge_between_cycles(monkeypatch):
+    """Repeated scheduler scans during one silence episode must not
+    re-queue nudge #1 once it has been sent.
+
+    Found by live E2E (delays 1m/2m/3m): nudge #1 was delivered twice,
+    because check_and_schedule_new_nudges runs every cycle and the
+    server only deduped UNSENT rows. With production delays this
+    would re-send #1 every 5 minutes until nudge #2 fell due. The
+    server now dedups nudge #1 per silence episode (episode_start).
+    """
+    fake = FakeMCP([make_silent_session()])
+    wire_scheduler(monkeypatch, fake)
+
+    await ns.check_and_schedule_new_nudges()
+    await ns.process_due_nudges()          # sends #1, queues #2
+    await ns.check_and_schedule_new_nudges()  # next scan, same episode
+    await ns.process_due_nudges()          # must NOT send #1 again
+
+    sent_first = [n for n in fake.nudges
+                  if n["nudge_number"] == 1 and n["sent_at"] is not None]
+    assert len(sent_first) == 1, f"nudge #1 sent {len(sent_first)} times"
+    unsent_first = [n for n in fake.unsent_nudges() if n["nudge_number"] == 1]
+    assert unsent_first == [], f"duplicate nudge #1 queued: {unsent_first}"
+
+
 async def test_bug3b_session_paused_after_third_nudge(monkeypatch):
     """Sending nudge #3 must pause the session (scheduler docstring:
     "After 3 nudges with no reply, session is auto-paused").

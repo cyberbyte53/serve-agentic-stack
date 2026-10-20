@@ -2129,6 +2129,20 @@ async def nudge_schedule(params: NudgeScheduleInput) -> dict:
             if existing:
                 return {"status": "already_scheduled", "id": str(existing.id)}
 
+            # Episode dedup for nudge #1: if any nudge (sent or not) was
+            # already scheduled at/after this silence episode began, this
+            # scan is a repeat — do not queue a duplicate first nudge.
+            if nudge_number == 1 and params.episode_start:
+                episode_row = (await db.execute(
+                    select(NudgeQueue).where(and_(
+                        NudgeQueue.session_id == UUID(session_id),
+                        NudgeQueue.cancelled == False,
+                        NudgeQueue.scheduled_at >= datetime.fromisoformat(params.episode_start),
+                    ))
+                )).scalars().first()
+                if episode_row:
+                    return {"status": "already_scheduled", "id": str(episode_row.id)}
+
             nudge = NudgeQueue(
                 session_id=UUID(session_id),
                 volunteer_phone=volunteer_phone,

@@ -84,12 +84,19 @@ class FakeMCP:
 
     # -- nudge queue tools ----------------------------------------------------
     def tool_nudge_schedule(self, session_id, volunteer_phone, nudge_number,
-                            scheduled_at, volunteer_name=""):
+                            scheduled_at, volunteer_name="", episode_start=None):
         for n in self.nudges:
             if (n["session_id"] == session_id
                     and n["nudge_number"] == nudge_number
                     and n["sent_at"] is None and not n["cancelled"]):
                 return {"status": "already_scheduled", "id": n["id"]}
+        # Episode dedup (mirrors serve-mcp-server): no second nudge #1
+        # for the same silence episode.
+        if nudge_number == 1 and episode_start:
+            for n in self.nudges:
+                if (n["session_id"] == session_id and not n["cancelled"]
+                        and n["scheduled_at"] >= episode_start):
+                    return {"status": "already_scheduled", "id": n["id"]}
         self._seq += 1
         row = {
             "id": f"nudge-{self._seq}",
