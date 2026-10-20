@@ -235,7 +235,7 @@ async def process_due_nudges() -> int:
         nudge_num = nudge["nudge_number"]
 
         # Compose from the volunteer's CURRENT session context so the
-        # message references where they actually left off (issue #25).
+        # message references where they actually left off.
         context: Dict = {}
         session_result = await _call_mcp_tool("get_session", {"session_id": session_id})
         if isinstance(session_result, dict):

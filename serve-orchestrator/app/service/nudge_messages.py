@@ -4,7 +4,7 @@ SERVE Orchestrator — Contextual Nudge Messages (pure functions, no I/O)
 Builds the WhatsApp nudge text for an inactive volunteer from their
 session context (workflow / active_agent / stage / persona), so nudges
 reference where the volunteer actually left off instead of sending the
-same generic copy to everyone (issue #25).
+same generic copy to everyone.
 
 Deterministic templates on purpose — like the delivery agent's policy
 engine, reminder copy is never an LLM decision. Personalisation is
@@ -19,7 +19,7 @@ WORKFLOW_REGISTRY) — no new bucket vocabulary is invented:
   DELIVERY_ASSISTANT — in the delivery journey with a class coming up
 Plus two non-agent cases, defined once below as constants:
   TAUGHT_BEFORE     — has completed sessions before, now inactive again
-  GENERIC           — fallback: the original pre-#25 copy, unchanged
+  GENERIC           — fallback: the original generic copy, unchanged
 """
 from typing import Dict, Optional, Union
 

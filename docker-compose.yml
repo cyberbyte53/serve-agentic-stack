@@ -122,7 +122,7 @@ services:
       - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-sunbird-serve}
       - AUTH_ENABLED=${AUTH_ENABLED:-false}
-      # Smart nudge scheduler (issue #25) — delays in minutes
+      # Smart nudge scheduler — delays in minutes
       - NUDGE_ENABLED=${NUDGE_ENABLED:-true}
       - NUDGE_DRY_RUN=${NUDGE_DRY_RUN:-false}
       - NUDGE_DELAY_1_MINUTES=${NUDGE_DELAY_1_MINUTES:-60}

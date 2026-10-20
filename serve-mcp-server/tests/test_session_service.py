@@ -1,4 +1,4 @@
-"""Unit tests for SessionService row serialisation (issue #25 opt-out).
+"""Unit tests for SessionService row serialisation (opt-out flag).
 
 _row_to_dict is the single place session rows become dicts for MCP
 tool callers (list_sessions, get_session, ...). Anything it omits is

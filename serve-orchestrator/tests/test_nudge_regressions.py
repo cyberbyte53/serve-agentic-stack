@@ -1,4 +1,4 @@
-"""Regression tests for issue #25 (Smart Nudges) — written BEFORE any fix.
+"""Regression tests for the smart nudge scheduler — written BEFORE any fix.
 
 Each test asserts the CORRECT behaviour. At commit 452eb1b they failed
 against the unmodified code for the reasons in each docstring; they now

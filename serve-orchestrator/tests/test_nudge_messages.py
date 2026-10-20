@@ -1,4 +1,4 @@
-"""Unit tests for contextual nudge messages (issue #25) and scheduler wiring."""
+"""Unit tests for contextual nudge messages and scheduler wiring."""
 from datetime import datetime, timedelta
 
 import pytest
