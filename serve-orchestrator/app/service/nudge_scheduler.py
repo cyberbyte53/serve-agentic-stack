@@ -6,7 +6,7 @@ Background task that sends reminder messages to inactive WhatsApp sessions.
 Schedule:
   Nudge #1: 1 hour after last message
   Nudge #2: 8 hours after last message
-  Nudge #3: 24 hours after last message (final)
+  Nudge #3: 23h45m after last message (final; inside WhatsApp's 24h window)
 
 After 3 nudges with no reply, session is auto-paused.
 Volunteer can reply "stop" to opt out permanently.
@@ -22,8 +22,9 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -39,6 +40,10 @@ NUDGE_DELAY_2_MINUTES = int(os.environ.get("NUDGE_DELAY_2_MINUTES", "480"))
 # the volunteer's last message, so the final nudge must land inside that
 # window (with margin for the check interval) or Meta rejects it.
 NUDGE_DELAY_3_MINUTES = int(os.environ.get("NUDGE_DELAY_3_MINUTES", "1425"))
+# Quiet window in IST (Asia/Kolkata, real UTC+5:30 via zoneinfo). The
+# window wraps midnight: START=21, END=8 means 21:00-23:59 and 00:00-08:00.
+# START == END disables quiet hours.
+IST = ZoneInfo("Asia/Kolkata")
 NUDGE_QUIET_HOURS_START = int(os.environ.get("NUDGE_QUIET_HOURS_START", "21"))
 NUDGE_QUIET_HOURS_END = int(os.environ.get("NUDGE_QUIET_HOURS_END", "8"))
 NUDGE_CHECK_INTERVAL_MINUTES = int(os.environ.get("NUDGE_CHECK_INTERVAL_MINUTES", "5"))
@@ -90,10 +95,18 @@ async def _call_mcp_tool(tool_name: str, arguments: Dict) -> Dict:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _is_quiet_hour() -> bool:
-    """Check if current time is within quiet hours (IST)."""
-    now = datetime.utcnow()
-    ist_hour = (now.hour + 5) % 24  # rough IST
+def _is_quiet_hour(at: Optional[datetime] = None) -> bool:
+    """Check if `at` (default: now) falls within quiet hours in IST.
+
+    `at` may be aware (converted to IST) or naive (treated as UTC).
+    The window wraps midnight when START > END (e.g. 21 -> 8).
+    """
+    if at is None:
+        ist_hour = datetime.now(IST).hour
+    else:
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        ist_hour = at.astimezone(IST).hour
     if NUDGE_QUIET_HOURS_START > NUDGE_QUIET_HOURS_END:
         return ist_hour >= NUDGE_QUIET_HOURS_START or ist_hour < NUDGE_QUIET_HOURS_END
     return NUDGE_QUIET_HOURS_START <= ist_hour < NUDGE_QUIET_HOURS_END
