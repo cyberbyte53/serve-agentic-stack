@@ -136,9 +136,10 @@ async def cancel_nudges_for_session(session_id: str) -> None:
     await _call_mcp_tool("nudge_cancel_for_session", {"session_id": session_id})
 
 
-def mark_do_not_disturb(session_id: str) -> None:
-    """Mark session as DND. We cancel nudges; the session.do_not_disturb flag is set via MCP."""
-    asyncio.ensure_future(cancel_nudges_for_session(session_id))
+async def mark_do_not_disturb(session_id: str) -> None:
+    """Persist the opt-out on the session and cancel any pending nudges."""
+    await _call_mcp_tool("nudge_set_do_not_disturb", {"session_id": session_id})
+    await cancel_nudges_for_session(session_id)
     logger.info(f"[nudge] Session {session_id[:8]}... marked as DO_NOT_DISTURB")
 
 

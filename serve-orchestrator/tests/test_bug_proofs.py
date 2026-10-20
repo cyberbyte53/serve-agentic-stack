@@ -182,8 +182,10 @@ def test_bug1b_mark_do_not_disturb_persists_the_flag(monkeypatch):
     monkeypatch.setattr(ns, "_call_mcp_tool", fake.call)
 
     async def run():
-        ns.mark_do_not_disturb(SESSION_ID)
-        await asyncio.sleep(0.1)  # let the ensure_future task run
+        result = ns.mark_do_not_disturb(SESSION_ID)
+        if asyncio.iscoroutine(result):
+            await result
+        await asyncio.sleep(0.1)  # let any scheduled task run too
 
     asyncio.run(run())
     dnd_writes = [t for t in fake.tools_called()

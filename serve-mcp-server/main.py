@@ -2216,6 +2216,31 @@ async def nudge_cancel_for_session(session_id: str) -> dict:
         return {"status": "error", "error": str(e)}
 
 
+@mcp.tool()
+async def nudge_set_do_not_disturb(session_id: str) -> dict:
+    """Persist a volunteer's nudge opt-out on their session.
+
+    Sets sessions.do_not_disturb so the nudge scheduler skips this
+    session in future cycles (the flag is returned by list_sessions).
+    """
+    from services.database import get_db, Session as DBSession, is_db_healthy
+    from sqlalchemy import update as sa_update
+    from uuid import UUID
+    if not is_db_healthy():
+        return {"status": "error", "error": "DB not available"}
+    try:
+        async with get_db() as db:
+            result = await db.execute(
+                sa_update(DBSession)
+                .where(DBSession.id == UUID(session_id))
+                .values(do_not_disturb=True)
+            )
+        return {"status": "success", "updated": result.rowcount}
+    except Exception as e:
+        logger.error(f"nudge_set_do_not_disturb failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # DASHBOARD HTTP ENDPOINTS
 # Must be registered BEFORE mcp.run() is called.

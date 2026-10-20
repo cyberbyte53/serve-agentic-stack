@@ -578,4 +578,5 @@ class SessionService:
             "created_at":      row.created_at.isoformat() if row.created_at else None,
             "updated_at":      row.updated_at.isoformat() if row.updated_at else None,
             "last_message_at": row.last_message_at.isoformat() if row.last_message_at else None,
+            "do_not_disturb":  bool(row.do_not_disturb),
         }

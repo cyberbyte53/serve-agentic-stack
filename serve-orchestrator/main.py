@@ -323,7 +323,7 @@ async def wa_receive(request: Request):
                 # Handle "stop" — opt out of nudges
                 if text.lower() in ("stop", "🚫 stop", "don't disturb", "no reminders"):
                     if session_id:
-                        mark_do_not_disturb(str(session_id))
+                        await mark_do_not_disturb(str(session_id))
                     await _wa_send(phone, "Got it! I won't send any more reminders. Your progress is saved — message anytime to continue. 🙏")
                     continue
 
