@@ -27,6 +27,8 @@ from typing import Dict, List, Optional
 
 import httpx
 
+from app.service.nudge_messages import build_nudge_message
+
 logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -37,6 +39,9 @@ NUDGE_DELAY_3_MINUTES = int(os.environ.get("NUDGE_DELAY_3_MINUTES", "1440"))
 NUDGE_QUIET_HOURS_START = int(os.environ.get("NUDGE_QUIET_HOURS_START", "21"))
 NUDGE_QUIET_HOURS_END = int(os.environ.get("NUDGE_QUIET_HOURS_END", "8"))
 NUDGE_CHECK_INTERVAL_MINUTES = int(os.environ.get("NUDGE_CHECK_INTERVAL_MINUTES", "5"))
+# Dry-run: compose and log messages without calling the WhatsApp API
+# (lets the whole flow be exercised without Meta credentials).
+NUDGE_DRY_RUN = os.environ.get("NUDGE_DRY_RUN", "false").lower() == "true"
 
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://serve-mcp-server:8004")
 
@@ -231,8 +236,24 @@ async def process_due_nudges() -> int:
         phone = nudge["volunteer_phone"]
         nudge_num = nudge["nudge_number"]
 
-        message = NUDGE_MESSAGES.get(nudge_num, NUDGE_MESSAGES[1])
-        success = await _send_whatsapp(phone, message)
+        # Compose from the volunteer's CURRENT session context so the
+        # message references where they actually left off (issue #25).
+        context: Dict = {}
+        session_result = await _call_mcp_tool("get_session", {"session_id": session_id})
+        if isinstance(session_result, dict):
+            context = session_result.get("session") or {}
+        if not context.get("volunteer_name") and nudge.get("volunteer_name"):
+            context = {**context, "volunteer_name": nudge["volunteer_name"]}
+        message = build_nudge_message(context, nudge_num)
+
+        if NUDGE_DRY_RUN:
+            logger.info(
+                f"[nudge][dry-run] Would send nudge #{nudge_num} to {phone[:6]}*** "
+                f"(session {session_id[:8]}...): {message!r}"
+            )
+            success = True
+        else:
+            success = await _send_whatsapp(phone, message)
 
         if success:
             # Mark as sent in DB
@@ -280,7 +301,7 @@ async def start_nudge_scheduler() -> None:
         logger.info("[nudge] Nudge scheduler DISABLED (NUDGE_ENABLED=false)")
         return
 
-    if not _WA_TOKEN or not _WA_PHONE_NUMBER_ID:
+    if not NUDGE_DRY_RUN and (not _WA_TOKEN or not _WA_PHONE_NUMBER_ID):
         logger.warning("[nudge] Nudge scheduler disabled — WhatsApp not configured")
         return
 
