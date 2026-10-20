@@ -245,7 +245,12 @@ class SessionService:
         _TERMINAL = {
             "need_submitted", "fulfillment_handoff_ready", "approved", "complete",
         }
-        new_status = "completed" if new_state in _TERMINAL else None
+        if new_state in _TERMINAL:
+            new_status = "completed"
+        elif new_state == "paused":
+            new_status = "paused"
+        else:
+            new_status = None
 
         if is_db_healthy():
             try:

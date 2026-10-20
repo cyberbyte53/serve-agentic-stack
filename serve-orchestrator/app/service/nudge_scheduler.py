@@ -254,6 +254,14 @@ async def process_due_nudges() -> int:
                     "scheduled_at": next_at.isoformat(),
                     "volunteer_name": nudge.get("volunteer_name", ""),
                 })
+            else:
+                # Final nudge sent with no reply — pause the session so it
+                # drops out of the active scan and no new cycle is scheduled.
+                await _call_mcp_tool("advance_session_state", {
+                    "session_id": session_id,
+                    "new_state": "paused",
+                })
+                logger.info(f"[nudge] Session {session_id[:8]}... auto-paused after final nudge")
         else:
             logger.warning(f"[nudge] Failed to send nudge #{nudge_num} to {phone[:6]}***")
 
