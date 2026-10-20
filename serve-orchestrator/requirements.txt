@@ -7,3 +7,7 @@ mcp>=1.0.0
 litellm>=1.40.0
 PyJWT>=2.8.0
 cryptography>=41.0.0
+
+# Dev / test only (not required at runtime)
+pytest>=7.4.0
+pytest-asyncio>=0.23.0

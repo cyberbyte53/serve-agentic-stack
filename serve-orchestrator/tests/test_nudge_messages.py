@@ -1,5 +1,4 @@
 """Unit tests for contextual nudge messages (issue #25) and scheduler wiring."""
-import asyncio
 from datetime import datetime, timedelta
 
 import pytest
@@ -7,7 +6,7 @@ import pytest
 from app.service import nudge_messages as nm
 from app.service import nudge_scheduler as ns
 
-from test_bug_proofs import FakeMCP, _silent_whatsapp_session, _wire
+from conftest import FakeMCP, make_silent_session, wire_scheduler
 
 
 # ── Bucket resolution ────────────────────────────────────────────────────────
@@ -86,9 +85,10 @@ def test_nudge_number_is_clamped():
 # ── Scheduler wiring ─────────────────────────────────────────────────────────
 
 def _due_onboarding_fake():
-    fake = FakeMCP([_silent_whatsapp_session()])
+    session = make_silent_session()
+    fake = FakeMCP([session])
     fake.nudges.append({
-        "id": "nudge-1", "session_id": _silent_whatsapp_session()["id"],
+        "id": "nudge-1", "session_id": session["id"],
         "volunteer_phone": "919999999999", "volunteer_name": "Asha Verma",
         "nudge_number": 1,
         "scheduled_at": (datetime.utcnow() - timedelta(minutes=5)).isoformat(),
@@ -97,9 +97,9 @@ def _due_onboarding_fake():
     return fake
 
 
-def test_scheduler_sends_contextual_message(monkeypatch):
+async def test_scheduler_sends_contextual_message(monkeypatch):
     fake = _due_onboarding_fake()
-    _wire(monkeypatch, fake)
+    wire_scheduler(monkeypatch, fake)
     sent_texts = []
 
     async def capture_send(to, text):
@@ -107,22 +107,22 @@ def test_scheduler_sends_contextual_message(monkeypatch):
         return True
 
     monkeypatch.setattr(ns, "_send_whatsapp", capture_send)
-    sent = asyncio.run(ns.process_due_nudges())
+    sent = await ns.process_due_nudges()
     assert sent == 1
     assert "eligibility" not in sent_texts[0]  # stage name never leaked raw
     assert "background" in sent_texts[0]       # contextual step phrase used
     assert "onboarding" in sent_texts[0]
 
 
-def test_scheduler_dry_run_logs_without_sending(monkeypatch):
+async def test_scheduler_dry_run_logs_without_sending(monkeypatch):
     fake = _due_onboarding_fake()
-    _wire(monkeypatch, fake)
+    wire_scheduler(monkeypatch, fake)
     monkeypatch.setattr(ns, "NUDGE_DRY_RUN", True)
 
     async def forbidden_send(to, text):  # pragma: no cover - must not be called
         raise AssertionError("WhatsApp send attempted in dry-run mode")
 
     monkeypatch.setattr(ns, "_send_whatsapp", forbidden_send)
-    sent = asyncio.run(ns.process_due_nudges())
+    sent = await ns.process_due_nudges()
     assert sent == 1
     assert fake.nudges[0]["sent_at"] is not None
