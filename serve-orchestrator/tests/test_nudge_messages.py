@@ -32,6 +32,26 @@ def test_resolve_bucket(context, expected):
     assert nm.resolve_bucket(context) == expected
 
 
+def test_onboarding_phrases_cover_registry_stages():
+    """The phrase map must cover exactly the onboarding-owned stages in
+    WORKFLOW_REGISTRY — if a stage is added/renamed there, this fails
+    instead of the copy silently drifting."""
+    assert set(nm._ONBOARDING_STEP_PHRASES) == nm._ONBOARDING_STAGES
+
+
+@pytest.mark.parametrize("context,expected", [
+    # No active_agent at all — resolution must come from the registry's
+    # stage -> responsible_agent mapping.
+    ({"workflow": "new_volunteer_onboarding", "stage": "contact_capture"}, "onboarding"),
+    ({"workflow": "returning_volunteer", "stage": "active"}, "matched"),
+    ({"workflow": "recommended_volunteer", "stage": "verifying_identity"}, "post_selection"),
+    ({"workflow": "delivery_support", "stage": "delivery_operations"}, "delivery"),
+    ({"workflow": "need_coordination", "stage": "drafting_need"}, "generic"),
+])
+def test_bucket_resolved_from_workflow_registry(context, expected):
+    assert nm.resolve_bucket(context) == expected
+
+
 # ── Message content ──────────────────────────────────────────────────────────
 
 def test_generic_fallback_matches_original_copy():

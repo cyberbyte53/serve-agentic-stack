@@ -41,27 +41,51 @@ GENERIC_MESSAGES = {
     ),
 }
 
-# ── Onboarding step phrases (stage -> what the volunteer was doing) ─────────
+# ── Stage knowledge comes from the orchestrator's workflow registry ────────
+# WORKFLOW_REGISTRY (workflow_validator.py) is the source of truth for
+# which stages exist and which agent is responsible for each. We only
+# add volunteer-friendly phrasing on top — registry display names are
+# admin labels (e.g. "Legacy Teaching Profile") unfit for a message.
 
-_ONBOARDING_STEPS = {
+from app.service.workflow_validator import (
+    NEW_VOLUNTEER_ONBOARDING_WORKFLOW,
+    WORKFLOW_REGISTRY,
+)
+
+# Onboarding-owned stages of the new-volunteer workflow, derived from
+# the registry so this can never drift from the real workflow.
+_ONBOARDING_STAGES = {
+    stage_id
+    for stage_id, stage in NEW_VOLUNTEER_ONBOARDING_WORKFLOW.stages.items()
+    if stage.responsible_agent == "onboarding"
+} - {"paused", "human_review"}
+
+# Volunteer-friendly phrase for each onboarding stage. Keys must cover
+# _ONBOARDING_STAGES exactly — a test enforces this against the registry.
+_ONBOARDING_STEP_PHRASES = {
     "welcome": "getting started",
     "orientation_video": "watching the short orientation video",
-    "intent_discovery": "telling us why you'd like to volunteer",
-    "purpose_orientation": "learning how SERVE works",
     "eligibility_screening": "a few quick details about your background",
-    "eligibility_confirmation": "a few quick details about your background",
     "contact_capture": "sharing your contact details",
-    "capability_discovery": "telling us the subjects you'd like to teach",
     "teaching_profile": "telling us the subjects and classes you'd like to teach",
     "registration_review": "reviewing your profile before registration",
-    "profile_confirmation": "reviewing your profile before registration",
 }
 
-_POST_SELECTION_STAGES = {
-    "onboarding_complete", "selection_conversation", "gathering_preferences",
-    "re_engaging", "profile_refresh", "matching_ready", "verifying_identity",
-    "not_registered",
-}
+
+def _responsible_agent(context: Dict) -> str:
+    """Agent responsible for the session's current stage, per the registry.
+
+    Falls back to the session's active_agent when the workflow/stage is
+    unknown to the registry (e.g. the volunteer_engagement workflow,
+    which the router knows but the validator registry does not).
+    """
+    workflow = WORKFLOW_REGISTRY.get(context.get("workflow") or "")
+    if workflow is not None:
+        stage = workflow.stages.get(context.get("stage") or "")
+        if stage is not None:
+            return stage.responsible_agent
+    return context.get("active_agent") or ""
+
 
 # ── Bucket resolution ────────────────────────────────────────────────────────
 
@@ -86,24 +110,24 @@ def _sessions_completed(context: Dict) -> int:
 
 
 def resolve_bucket(context: Dict) -> str:
-    """Map session context to a message bucket."""
+    """Map session context to a message bucket.
+
+    Bucket is decided by the agent responsible for the current stage
+    (per WORKFLOW_REGISTRY), with taught-before taking precedence for
+    engagement-stage volunteers who have already taught.
+    """
     workflow = context.get("workflow") or ""
-    agent = context.get("active_agent") or ""
-    stage = context.get("stage") or ""
+    agent = _responsible_agent(context)
 
     if workflow == "delivery_support" or agent in ("delivery_assistant", "delivery"):
         return "delivery"
     if _sessions_completed(context) > 0:
         return "taught_before"
-    if agent == "fulfillment" or workflow == "fulfillment":
+    if agent == "fulfillment":
         return "matched"
-    if (
-        agent in ("engagement", "selection")
-        or workflow in ("returning_volunteer", "volunteer_engagement", "recommended_volunteer")
-        or stage in _POST_SELECTION_STAGES
-    ):
+    if agent in ("engagement", "selection"):
         return "post_selection"
-    if workflow == "new_volunteer_onboarding" or agent == "onboarding" or stage in _ONBOARDING_STEPS:
+    if agent == "onboarding" or (context.get("stage") or "") in _ONBOARDING_STAGES:
         return "onboarding"
     return "generic"
 
@@ -111,7 +135,7 @@ def resolve_bucket(context: Dict) -> str:
 def _hook(bucket: str, context: Dict) -> str:
     """One sentence referencing where the volunteer left off."""
     if bucket == "onboarding":
-        step = _ONBOARDING_STEPS.get(context.get("stage") or "", "getting started")
+        step = _ONBOARDING_STEP_PHRASES.get(context.get("stage") or "", "getting started")
         return f"You had started your volunteer onboarding with SERVE and left it at {step}."
     if bucket == "post_selection":
         return "You had shown interest in teaching with SERVE and completed your initial steps."
