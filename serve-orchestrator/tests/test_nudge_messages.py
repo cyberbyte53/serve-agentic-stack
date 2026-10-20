@@ -36,8 +36,8 @@ def test_resolve_bucket(context, expected):
 
 def test_generic_fallback_matches_original_copy():
     for n in (1, 2, 3):
-        assert nm.build_nudge_message({}, n) == ns.NUDGE_MESSAGES[n]
-        assert nm.build_nudge_message({"workflow": "unknown"}, n) == ns.NUDGE_MESSAGES[n]
+        assert nm.build_nudge_message({}, n) == nm.GENERIC_MESSAGES[n]
+        assert nm.build_nudge_message({"workflow": "unknown"}, n) == nm.GENERIC_MESSAGES[n]
 
 
 def test_onboarding_message_references_step_and_first_name():

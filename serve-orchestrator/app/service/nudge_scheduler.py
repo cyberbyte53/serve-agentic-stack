@@ -50,27 +50,8 @@ _WA_TOKEN = os.environ.get("WHATSAPP_TOKEN", "")
 _WA_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 _WA_GRAPH_URL = "https://graph.facebook.com/v18.0"
 
-# ── Nudge messages ────────────────────────────────────────────────────────────
-NUDGE_MESSAGES = {
-    1: (
-        "Hi! We had a brief technical issue on our end — apologies for the interruption. "
-        "Your progress is fully saved. Just reply here to continue right where you left off. 🙏\n\n"
-        "Reply:\n"
-        "▶️ *continue* — pick up where you left off\n"
-        "⏰ *later* — remind me in a few hours\n"
-        "🚫 *stop* — don't send reminders"
-    ),
-    2: (
-        "Hey! Just a quick check-in — your progress is saved and we're ready "
-        "whenever you are. Reply anytime to continue, or 'stop' for no more reminders."
-    ),
-    3: (
-        "Hi! We're still here whenever you're ready. Your progress is saved — "
-        "just message anytime. This is our last reminder. 🙂"
-    ),
-}
-
 # ── Nudge delays (minutes from last message) ─────────────────────────────────
+# Message copy lives in nudge_messages.py (GENERIC_MESSAGES is the fallback).
 NUDGE_DELAYS = {
     1: NUDGE_DELAY_1_MINUTES,
     2: NUDGE_DELAY_2_MINUTES,
