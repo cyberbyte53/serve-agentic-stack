@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.schemas import AgentType
 from app.service import nudge_messages as nm
 from app.service import nudge_scheduler as ns
 
@@ -13,20 +14,20 @@ from conftest import FakeMCP, make_silent_session, wire_scheduler
 
 @pytest.mark.parametrize("context,expected", [
     ({"workflow": "new_volunteer_onboarding", "active_agent": "onboarding",
-      "stage": "eligibility_screening"}, "onboarding"),
+      "stage": "eligibility_screening"}, AgentType.ONBOARDING),
     ({"workflow": "new_volunteer_onboarding", "active_agent": "selection",
-      "stage": "onboarding_complete"}, "post_selection"),
+      "stage": "onboarding_complete"}, AgentType.SELECTION),
     ({"workflow": "returning_volunteer", "active_agent": "engagement",
-      "stage": "matching_ready"}, "post_selection"),
+      "stage": "matching_ready"}, AgentType.ENGAGEMENT),
     ({"workflow": "returning_volunteer", "active_agent": "fulfillment",
-      "stage": "active"}, "matched"),
+      "stage": "active"}, AgentType.FULFILLMENT),
     ({"workflow": "delivery_support", "active_agent": "delivery_assistant",
-      "stage": "delivery_operations"}, "delivery"),
+      "stage": "delivery_operations"}, AgentType.DELIVERY_ASSISTANT),
     ({"workflow": "returning_volunteer", "active_agent": "engagement",
-      "stage": "matching_ready", "sessions_completed": 2}, "taught_before"),
+      "stage": "matching_ready", "sessions_completed": 2}, nm.TAUGHT_BEFORE),
     ({"workflow": "need_coordination", "active_agent": "need",
-      "stage": "drafting_need"}, "generic"),
-    ({}, "generic"),
+      "stage": "drafting_need"}, nm.GENERIC),
+    ({}, nm.GENERIC),
 ])
 def test_resolve_bucket(context, expected):
     assert nm.resolve_bucket(context) == expected
@@ -42,11 +43,11 @@ def test_onboarding_phrases_cover_registry_stages():
 @pytest.mark.parametrize("context,expected", [
     # No active_agent at all — resolution must come from the registry's
     # stage -> responsible_agent mapping.
-    ({"workflow": "new_volunteer_onboarding", "stage": "contact_capture"}, "onboarding"),
-    ({"workflow": "returning_volunteer", "stage": "active"}, "matched"),
-    ({"workflow": "recommended_volunteer", "stage": "verifying_identity"}, "post_selection"),
-    ({"workflow": "delivery_support", "stage": "delivery_operations"}, "delivery"),
-    ({"workflow": "need_coordination", "stage": "drafting_need"}, "generic"),
+    ({"workflow": "new_volunteer_onboarding", "stage": "contact_capture"}, AgentType.ONBOARDING),
+    ({"workflow": "returning_volunteer", "stage": "active"}, AgentType.FULFILLMENT),
+    ({"workflow": "recommended_volunteer", "stage": "verifying_identity"}, AgentType.ENGAGEMENT),
+    ({"workflow": "delivery_support", "stage": "delivery_operations"}, AgentType.DELIVERY_ASSISTANT),
+    ({"workflow": "need_coordination", "stage": "drafting_need"}, nm.GENERIC),
 ])
 def test_bucket_resolved_from_workflow_registry(context, expected):
     assert nm.resolve_bucket(context) == expected

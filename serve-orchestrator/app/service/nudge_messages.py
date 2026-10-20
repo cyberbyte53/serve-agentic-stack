@@ -10,15 +10,22 @@ Deterministic templates on purpose — like the delivery agent's policy
 engine, reminder copy is never an LLM decision. Personalisation is
 limited to an optional first name.
 
-Buckets:
-  onboarding      — dropped mid-onboarding; references the step left at
-  post_selection  — finished initial steps / in engagement, not yet matched
-  matched         — with the fulfillment agent, awaiting first session
-  taught_before   — has completed sessions before, now inactive again
-  delivery        — in the delivery journey with a class to show up for
-  generic         — fallback: the original pre-#25 copy, unchanged
+Message hooks are keyed by the responsible agent (AgentType, per
+WORKFLOW_REGISTRY) — no new bucket vocabulary is invented:
+  ONBOARDING        — dropped mid-onboarding; references the step left at
+  SELECTION /
+  ENGAGEMENT        — finished initial steps, not yet matched
+  FULFILLMENT       — matched, awaiting first session
+  DELIVERY_ASSISTANT — in the delivery journey with a class coming up
+Plus two non-agent cases, defined once below as constants:
+  TAUGHT_BEFORE     — has completed sessions before, now inactive again
+  GENERIC           — fallback: the original pre-#25 copy, unchanged
 """
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
+
+# Non-agent hook keys (agent-keyed hooks use AgentType members directly).
+TAUGHT_BEFORE = "taught_before"
+GENERIC = "generic"
 
 # ── Original generic copy (fallback, unchanged) ──────────────────────────────
 
@@ -47,7 +54,7 @@ GENERIC_MESSAGES = {
 # add volunteer-friendly phrasing on top — registry display names are
 # admin labels (e.g. "Legacy Teaching Profile") unfit for a message.
 
-from app.schemas import OnboardingState
+from app.schemas import AgentType, OnboardingState, WorkflowType
 from app.service.workflow_validator import (
     NEW_VOLUNTEER_ONBOARDING_WORKFLOW,
     WORKFLOW_REGISTRY,
@@ -67,7 +74,7 @@ def _parse_onboarding_state(context: Dict) -> Optional[OnboardingState]:
 _ONBOARDING_STAGES = {
     state
     for stage_id, stage in NEW_VOLUNTEER_ONBOARDING_WORKFLOW.stages.items()
-    if stage.responsible_agent == "onboarding"
+    if stage.responsible_agent == AgentType.ONBOARDING.value
     for state in [_parse_onboarding_state({"stage": stage_id})]
     if state is not None
 } - {OnboardingState.PAUSED, OnboardingState.HUMAN_REVIEW}
@@ -85,19 +92,26 @@ _ONBOARDING_STEP_PHRASES = {
 }
 
 
-def _responsible_agent(context: Dict) -> str:
+def _responsible_agent(context: Dict) -> Optional[AgentType]:
     """Agent responsible for the session's current stage, per the registry.
 
     Falls back to the session's active_agent when the workflow/stage is
     unknown to the registry (e.g. the volunteer_engagement workflow,
     which the router knows but the validator registry does not).
+    Returns None for agents outside AgentType (e.g. helpline).
     """
+    raw = None
     workflow = WORKFLOW_REGISTRY.get(context.get("workflow") or "")
     if workflow is not None:
         stage = workflow.stages.get(context.get("stage") or "")
         if stage is not None:
-            return stage.responsible_agent
-    return context.get("active_agent") or ""
+            raw = stage.responsible_agent
+    if raw is None:
+        raw = context.get("active_agent") or ""
+    try:
+        return AgentType(raw)
+    except ValueError:
+        return None
 
 
 # ── Bucket resolution ────────────────────────────────────────────────────────
@@ -122,41 +136,46 @@ def _sessions_completed(context: Dict) -> int:
     return 0
 
 
-def resolve_bucket(context: Dict) -> str:
-    """Map session context to a message bucket.
+def resolve_bucket(context: Dict) -> Union[AgentType, str]:
+    """Map session context to a hook key.
 
-    Bucket is decided by the agent responsible for the current stage
-    (per WORKFLOW_REGISTRY), with taught-before taking precedence for
-    engagement-stage volunteers who have already taught.
+    Returns the AgentType responsible for the current stage (per
+    WORKFLOW_REGISTRY), or TAUGHT_BEFORE / GENERIC for the non-agent
+    cases. Taught-before takes precedence for engagement-stage
+    volunteers who have already taught.
     """
     workflow = context.get("workflow") or ""
     agent = _responsible_agent(context)
 
-    if workflow == "delivery_support" or agent in ("delivery_assistant", "delivery"):
-        return "delivery"
+    if workflow == WorkflowType.DELIVERY_SUPPORT.value or agent is AgentType.DELIVERY_ASSISTANT:
+        return AgentType.DELIVERY_ASSISTANT
     if _sessions_completed(context) > 0:
-        return "taught_before"
-    if agent == "fulfillment":
-        return "matched"
-    if agent in ("engagement", "selection"):
-        return "post_selection"
-    if agent == "onboarding" or _parse_onboarding_state(context) in _ONBOARDING_STAGES:
-        return "onboarding"
-    return "generic"
+        return TAUGHT_BEFORE
+    if agent in (
+        AgentType.ONBOARDING,
+        AgentType.SELECTION,
+        AgentType.ENGAGEMENT,
+        AgentType.FULFILLMENT,
+        AgentType.DELIVERY_ASSISTANT,
+    ):
+        return agent
+    if _parse_onboarding_state(context) in _ONBOARDING_STAGES:
+        return AgentType.ONBOARDING
+    return GENERIC
 
 
-def _hook(bucket: str, context: Dict) -> str:
+def _hook(bucket: Union[AgentType, str], context: Dict) -> str:
     """One sentence referencing where the volunteer left off."""
-    if bucket == "onboarding":
+    if bucket is AgentType.ONBOARDING:
         step = _ONBOARDING_STEP_PHRASES.get(_parse_onboarding_state(context), "getting started")
         return f"You had started your volunteer onboarding with SERVE and left it at {step}."
-    if bucket == "post_selection":
+    if bucket in (AgentType.SELECTION, AgentType.ENGAGEMENT):
         return "You had shown interest in teaching with SERVE and completed your initial steps."
-    if bucket == "matched":
+    if bucket is AgentType.FULFILLMENT:
         return "You've been matched with a teaching opportunity with SERVE, and we're holding your place."
-    if bucket == "taught_before":
+    if bucket == TAUGHT_BEFORE:
         return "You taught with SERVE before — you showed up, and it mattered to your students."
-    if bucket == "delivery":
+    if bucket is AgentType.DELIVERY_ASSISTANT:
         return "You have a class coming up with SERVE, and we want to make sure you're all set for it."
     return ""
 
@@ -172,7 +191,7 @@ def build_nudge_message(context: Dict, nudge_number: int) -> str:
     """
     number = min(3, max(1, int(nudge_number)))
     bucket = resolve_bucket(context or {})
-    if bucket == "generic":
+    if bucket == GENERIC:
         return GENERIC_MESSAGES[number]
 
     name = _first_name(context)
